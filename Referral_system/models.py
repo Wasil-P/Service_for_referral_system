@@ -3,11 +3,12 @@ import string
 from datetime import datetime, timedelta
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.dispatch import receiver
+from django.db.models.signals import post_save
 
 
 class Users(AbstractUser):
     email = models.EmailField(null=False)
-    referral_code = models.CharField(max_length=20, unique=True, blank=True)
 
     class Meta:
         db_table = "users"
@@ -40,8 +41,20 @@ class ReferralCode(models.Model):
 
 class ReferralRelationship(models.Model):
     inviter = models.ForeignKey(Users, related_name='inviter', on_delete=models.CASCADE)
-    invited = models.ForeignKey(Users, related_name='invited', on_delete=models.CASCADE)
+    invited = models.ForeignKey(Users, related_name='invited', on_delete=models.CASCADE, null=True)
     refer_token = models.ForeignKey(ReferralCode, verbose_name="referral_code", on_delete=models.CASCADE)
+
+    class Meta:
+        db_table = "relationship"
 
     def __str__(self):
         return f"{self.inviter}_{self.invited}"
+
+
+@receiver([post_save], sender=ReferralCode)
+def target(sender, instance: ReferralCode, **kwargs):
+    referral_code = ReferralCode.objects.get(code=instance.code)
+    new_relationship = ReferralRelationship.objects.create(
+        inviter=instance.user,
+        refer_token=referral_code)
+    new_relationship.save()
