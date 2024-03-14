@@ -1,0 +1,8 @@
+.venv
+.idea
+__pycache__
+Referral_system/__pycache__/
+Service_for_referral_system/__pycache__/
+Referral_system/API/__pycache__/
+test_.py
+db.sqlite3
