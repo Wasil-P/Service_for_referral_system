@@ -3,8 +3,6 @@ import string
 from datetime import datetime, timedelta
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-from django.dispatch import receiver
-from django.db.models.signals import post_save
 from django.core.exceptions import ValidationError
 
 
@@ -58,11 +56,3 @@ class ReferralRelationship(models.Model):
     def __str__(self):
         return f"{self.inviter}_{self.invited}"
 
-
-@receiver([post_save], sender=ReferralCode)
-def target(sender, instance: ReferralCode, **kwargs):
-    referral_code = ReferralCode.objects.get(code=instance.code)
-    new_relationship = ReferralRelationship.objects.create(
-        inviter=instance.user,
-        refer_token=referral_code)
-    new_relationship.save()

@@ -1,19 +1,20 @@
 from .serializers import UserModelSerializer, ReferralCodeModelSerializer, ReferralRelationshipSerializer
 from .permissions import IsOwner
-from ..models import ReferralCode, Users
+from ..models import ReferralCode, Users, ReferralRelationship
 
-from rest_framework import generics
+from rest_framework.exceptions import ValidationError, NotFound
+from rest_framework.response import Response
+from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
+
 
 class UserCreateAPIView(generics.CreateAPIView):
     """Возможность регистрации на сайте"""
-
     serializer_class = UserModelSerializer
 
 
 class ReferralCodeCreateAPIView(generics.CreateAPIView):
-    """Создание реферального кода юзером.
-    Создание реферальных отношений"""
+    """Создание реферального кода юзером."""
     serializer_class = ReferralCodeModelSerializer
     permission_classes = [IsAuthenticated]
 
@@ -39,24 +40,52 @@ class ReferralCodeListAPIView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # referrer_email = self.request.query_params.get("bob@gmail.com")
-        referrer_email = self.request.GET.get("referrer_email")
-        user_with_email = Users.objects.filter(email=referrer_email).first()
-        return ReferralCode.objects.filter(user=user_with_email).values("code")
+        referrer_email = self.request.data.get("referrer_email")
+        try:
+            user_email = Users.objects.get(email=referrer_email)
+        except Users.DoesNotExist:
+            raise NotFound(f"Нет зарегистрированного пользователя с адресом '{referrer_email}'")
+        id_ = user_email.id
+        code = ReferralCode.objects.filter(user_id=id_, is_active=True).values("code")
+        return code
 
 
-class ReferralRelationshipAddAPIView(generics.CreateAPIView):
-    """Установление реферальных отношений"""
+class RelationshipInvitedAddAPIView(generics.CreateAPIView):
+    """Создание реферальных отношений"""
     serializer_class = ReferralRelationshipSerializer
     permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
+    def perform_create(self, request):
         refer_token = self.request.data.get('refer_token')
-        inviter = ReferralCode.objects.get(code=refer_token).user
-        # inviter = ReferralCode.objects.filter(code=refer_token).first()
-        serializer.save(inviter=inviter,
-                        invited=self.request.user,
-                        refer_token=refer_token
-                        )
+        try:
+            referral_code = ReferralCode.objects.get(code=refer_token)
+        except ReferralCode.DoesNotExist:
+            raise NotFound(f"Реферальный код '{refer_token}' не найден.")
+        code = ReferralCode.objects.get(code=refer_token)
+        if not code.is_active:
+            raise ValidationError("Реферальный код не активен")
+
+        inviter = referral_code.user
+        referral_relationship = ReferralRelationship.objects.create(
+            inviter=inviter,
+            invited=self.request.user,
+            refer_token=referral_code
+        )
+        referral_relationship.save()
+        code.is_active = False
+        code.save()
+        return Response({"message": "Реферальный код активирован"}, status=status.HTTP_200_OK)
 
 
+class InvitedesListAPIView(generics.ListAPIView):
+    """Список рефералов по id реферера"""
+    serializer_class = ReferralRelationshipSerializer
+    permission_classes = [IsOwner]
+    lookup_url_kwarg = "inviter_id"
+    lookup_field = "inviter_id"
+
+    def get_queryset(self):
+        return ReferralRelationship.objects.filter(inviter=self.request.user) \
+            .select_related("users") \
+            .values("invited__username", "invited_id__email") \
+            .order_by("invited__username")

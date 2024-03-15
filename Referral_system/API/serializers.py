@@ -17,14 +17,17 @@ class UserModelSerializer(serializers.ModelSerializer):
 
 
 class ReferralCodeModelSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField()
 
     class Meta:
         model = ReferralCode
-        fields = ['user']
+        fields = '__all__'
 
 
 class ReferralRelationshipSerializer(serializers.ModelSerializer):
+    inviter = serializers.StringRelatedField()
+    refer_token = serializers.StringRelatedField()
 
     class Meta:
         model = ReferralRelationship
-        fields = ['inviter', 'invited', 'refer_token']
+        fields = '__all__'
