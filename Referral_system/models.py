@@ -5,6 +5,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.dispatch import receiver
 from django.db.models.signals import post_save
+from django.core.exceptions import ValidationError
 
 
 class Users(AbstractUser):
@@ -15,6 +16,12 @@ class Users(AbstractUser):
 
     def __str__(self):
         return self.username
+
+
+def validate_date(user):
+    existing_active_codes = ReferralCode.objects.filter(user=user, is_active=True)
+    if existing_active_codes.exists():
+        raise ValidationError("У пользователя уже есть активный ReferralCode.")
 
 
 def create_expiration_date():
@@ -28,9 +35,10 @@ def generate_referral_code(length=15):
 
 
 class ReferralCode(models.Model):
-    user = models.OneToOneField(Users, on_delete=models.CASCADE)
+    user = models.ForeignKey(Users, on_delete=models.CASCADE, validators=[validate_date])
     code = models.CharField(max_length=15, unique=True, default=generate_referral_code)
     expiration_date = models.DateTimeField(default=create_expiration_date)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "code"
