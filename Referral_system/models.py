@@ -4,10 +4,11 @@ from datetime import datetime, timedelta
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
+from asgiref.sync import sync_to_async
 
 
 class Users(AbstractUser):
-    email = models.EmailField(null=False)
+    email = models.EmailField(null=False, unique=True)
 
     class Meta:
         db_table = "users"
@@ -16,8 +17,8 @@ class Users(AbstractUser):
         return self.username
 
 
-def validate_date(user):
-    existing_active_codes = ReferralCode.objects.filter(user=user, is_active=True)
+async def validate_date(cls, user):
+    existing_active_codes = await sync_to_async(cls.objects.filter)(user=user, is_active=True)
     if existing_active_codes.exists():
         raise ValidationError("У пользователя уже есть активный ReferralCode.")
 
