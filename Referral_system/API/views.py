@@ -12,14 +12,20 @@ class UserCreateAPIView(generics.CreateAPIView):
     """Возможность регистрации на сайте"""
     serializer_class = UserModelSerializer
 
+    def post(self, request, *args, **kwargs):
+        Users(username=self.request.user)
+        return Response({"message": f"Пользователь создан"}, status=status.HTTP_201_CREATED)
+
 
 class ReferralCodeCreateAPIView(generics.CreateAPIView):
     """Создание реферального кода юзером."""
     serializer_class = ReferralCodeModelSerializer
     permission_classes = [IsAuthenticated]
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+    def post(self, request, *args, **kwargs):
+        code = ReferralCode(user=self.request.user)
+        code.save()
+        return Response({"message": f"Реферальный код создан - {code.code}"}, status=status.HTTP_201_CREATED)
 
 
 class ReferralCodeDeleteAPIView(generics.DestroyAPIView):
@@ -29,9 +35,10 @@ class ReferralCodeDeleteAPIView(generics.DestroyAPIView):
     lookup_field = "id"
     permission_classes = [IsOwner]
 
-    def get_queryset(self):
+    def delete(self, request, *args, **kwargs):
         referral_code_instance = ReferralCode.objects.get(user=self.request.user)
         referral_code_instance.delete()
+        return Response({"message": "Реферальный код удалён"}, status=status.HTTP_204_NO_CONTENT)
 
 
 class ReferralCodeListAPIView(generics.ListAPIView):
